@@ -14,6 +14,8 @@ public:
 
     inline bool operator==(Point const& p) { return p.x == x && p.y == y; }
 
+    uint32 GetDim(uint32 dim) const { return (dim == 0) ? x : y; }
+
 public:
     uint32 x = 0;
     uint32 y = 0;

@@ -4,6 +4,7 @@
 
 #include "QuadTree.h"
 #include "PointQuadTree.h"
+#include "KdTree.h"
 
 class HighResClock
 {
@@ -71,6 +72,25 @@ int main(int argc, char** argv)
         }
 
         printf("PointQuadTree - %u inserts took %u ms\n",
+            loops, clock.GetDuration());
+    }
+
+    // measure KdTree
+    {
+        HighResClock clock;
+
+        KdTree tree(space_size, space_size);
+
+        for (uint32 i = 0; i < loops; ++i)
+        {
+            uint32 x = dis(gen);
+            uint32 y = dis(gen);
+            Point p(x, y);
+
+            tree.Insert(p);
+        }
+
+        printf("KdTree - %u inserts took %u ms\n",
             loops, clock.GetDuration());
     }
 }
