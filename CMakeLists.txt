@@ -4,6 +4,9 @@ project(GeometricDS)
 
 set (CMAKE_CXX_FLAGS "-std=c++11 -ggdb")
 
+include_directories(${GeometricDS_SOURCE_DIR}/src/algorithm)
+include_directories(${GeometricDS_SOURCE_DIR}/src/util)
+
 file(GLOB SOURCES "src/*.cpp")
 
 add_executable(runnable ${SOURCES})

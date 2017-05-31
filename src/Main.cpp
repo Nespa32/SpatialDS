@@ -2,7 +2,7 @@
 #include <random>
 #include <chrono>
 
-#include "QuadTree.h"
+#include "PRQuadTree.h"
 #include "PointQuadTree.h"
 #include "KdTree.h"
 

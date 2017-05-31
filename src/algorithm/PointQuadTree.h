@@ -1,20 +1,18 @@
 
-#ifndef _QUADTREE_H
-#define _QUADTREE_H
+#ifndef _POINT_QUADTREE_H
+#define _POINT_QUADTREE_H
 
-#include <memory>
-#include "Point.h"
+#include "AbstractSpatialDS.h"
 
-// basic implementation of a Point Region Quad Tree
-class PRQuadTree
+class PointQuadTree : public AbstractSpatialDS
 {
 public:
     // @todo: could templatize scale
-    explicit PRQuadTree(uint32 maxX, uint32 maxY);
+    explicit PointQuadTree(uint32 maxX, uint32 maxY);
 
-    bool Find(Point const& p);
-    void Insert(Point const& p);
-    void Delete(Point const& p);
+    bool Find(Point const& p) override;
+    void Insert(Point const& p) override;
+    void Delete(Point const& p) override;
 
 public:
     struct TreeNode; // forward declaration
@@ -40,10 +38,10 @@ private:
     TreeNode _root;
 };
 
-PRQuadTree::PRQuadTree(uint32 maxX, uint32 maxY) :
+PointQuadTree::PointQuadTree(uint32 maxX, uint32 maxY) :
     _maxX(maxX), _maxY(maxY) { }
 
-bool PRQuadTree::Find(Point const& p)
+bool PointQuadTree::Find(Point const& p)
 {
     TreeNode* ptr = &_root;
     uint32 lowerX = 0;
@@ -53,12 +51,15 @@ bool PRQuadTree::Find(Point const& p)
 
     while (ptr)
     {
-        if (ptr->children[0] == nullptr)
-            return ptr->point && *ptr->point == p;
+        if (ptr->point == nullptr)
+            return false; // reached a leaf
+
+        if (*ptr->point == p)
+            return true; // found the point
 
         // calc which quadrant p is on
-        uint32 centerX = lowerX + (upperX - lowerX) / 2;
-        uint32 centerY = lowerY + (upperY - lowerY) / 2;
+        uint32 centerX = ptr->point->x;
+        uint32 centerY = ptr->point->y;
 
         //   ---------
         // Y | 2 | 3 |
@@ -84,7 +85,7 @@ bool PRQuadTree::Find(Point const& p)
     return false;
 }
 
-void PRQuadTree::Insert(Point const& p)
+void PointQuadTree::Insert(Point const& p)
 {
     TreeNode* ptr = &_root;
     uint32 lowerX = 0;
@@ -94,39 +95,31 @@ void PRQuadTree::Insert(Point const& p)
 
     while (true)
     {
+        // free slot, just need to add the point
+        if (ptr->point == nullptr)
+        {
+            ptr->point = new Point(p);
+            return;
+        }
+
+        // same coordinates, point already exists
+        if (*ptr->point == p)
+            return;
+
+        // init children
+        // we lazy-create children to save some memory
         if (ptr->children[0] == nullptr)
         {
-            // free slot, just need to add the point
-            if (ptr->point == nullptr)
+            for (TreeNode*& child : ptr->children)
             {
-                ptr->point = new Point(p);
-                return;
-            }
-            // need to split
-            else
-            {
-                // same coordinates, point already exists
-                if (ptr->point && *ptr->point == p)
-                    return;
-
-                Point* point = ptr->point;
-                ptr->point = nullptr;
-                for (TreeNode*& child : ptr->children)
-                {
-                    child = new TreeNode();
-                    child->parent = ptr;
-                }
-
-                // insert existing point
-                Insert(*point);
-
-                delete point;
+                child = new TreeNode();
+                child->parent = ptr;
             }
         }
 
         // calc which quadrant p is on
-        uint32 centerX = lowerX + (upperX - lowerX) / 2;
-        uint32 centerY = lowerY + (upperY - lowerY) / 2;
+        uint32 centerX = ptr->point->x;
+        uint32 centerY = ptr->point->y;
 
         //   ---------
         // Y | 2 | 3 |
@@ -150,7 +143,7 @@ void PRQuadTree::Insert(Point const& p)
     }
 }
 
-void PRQuadTree::Delete(Point const& p)
+void PointQuadTree::Delete(Point const& p)
 {
     TreeNode* ptr = &_root;
     uint32 lowerX = 0;
@@ -160,17 +153,20 @@ void PRQuadTree::Delete(Point const& p)
 
     while (ptr)
     {
-        if (ptr->children[0] == nullptr)
+        if (ptr->point == nullptr)
+            return; // leaf node, but point not found
+
+        if (*ptr->point == p)
         {
-            if (ptr->point && *ptr->point == p)
-                break;
-            else
-                return;
+            // @todo: delete logic
+            // need to remove the node from the tree
+            // and then reinsert every child node
+            return;
         }
 
         // calc which quadrant p is on
-        uint32 centerX = lowerX + (upperX - lowerX) / 2;
-        uint32 centerY = lowerY + (upperY - lowerY) / 2;
+        uint32 centerX = ptr->point->x;
+        uint32 centerY = ptr->point->y;
 
         //   ---------
         // Y | 2 | 3 |
@@ -192,34 +188,6 @@ void PRQuadTree::Delete(Point const& p)
 
         ptr = ptr->children[idx];
     }
-
-    if (ptr->point && *ptr->point == p)
-    {
-        Point* point = ptr->point;
-        while (ptr->point && *ptr->point == p)
-        {
-            ptr->point = nullptr;
-            if (ptr->parent == nullptr)
-                break;
-
-            bool otherNode = false;
-            for (TreeNode* node : ptr->parent->children)
-            {
-                if (node->point || node->children[0])
-                    otherNode = true;
-            }
-
-            if (otherNode == false)
-            {
-                ptr = ptr->parent;
-                ptr->point = point;
-            }
-        }
-
-        delete point;
-    }
 }
 
-#endif // _QUADTREE_H
-
-
+#endif // _POINT_QUADTREE_H
