@@ -11,7 +11,7 @@ public:
     Point(uint32 pointX, uint32 pointY) : x(pointX), y(pointY) { }
     Point(Point const& p) : x(p.x), y(p.y) { }
 
-    inline bool operator==(Point const& p) { return p.x == x && p.y == y; }
+    inline bool operator==(Point const& p) const { return p.x == x && p.y == y; }
 
     uint32 GetDim(uint32 dim) const { return (dim == 0) ? x : y; }
     void SetDim(uint32 dim, uint32 val);

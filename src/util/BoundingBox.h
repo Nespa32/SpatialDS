@@ -19,7 +19,13 @@ public:
     bool Contains(Point const& p) const
     {
         return _lower.x <= p.x && p.x <= _upper.x &&
-            _lower.y <= p.x && p.y <= _upper.y;
+            _lower.y <= p.y && p.y <= _upper.y;
+    }
+
+    bool Intersects(BoundingBox const& box) const
+    {
+        return _lower.x <= box._upper.x || _lower.y <= box._upper.y ||
+               _upper.x >= box._lower.x || _upper.y >= box._lower.y;
     }
 
     Point GetCenter() const
@@ -29,9 +35,12 @@ public:
         return Point(centerX, centerY);
     }
 
+    Point GetLower() const { return _lower; }
+    Point GetUpper() const { return _upper; }
+
     BoundingBox UpdateLowerX(uint32 x) const { return BoundingBox(x, _lower.y, _upper.x, _upper.y); }
-    BoundingBox UpdateUpperX(uint32 x) const { return BoundingBox(_lower.x, x, _upper.x, _upper.y); }
-    BoundingBox UpdateLowerY(uint32 y) const { return BoundingBox(_lower.x, _lower.y, y, _upper.y); }
+    BoundingBox UpdateUpperX(uint32 x) const { return BoundingBox(_lower.x, _lower.y, x, _upper.y); }
+    BoundingBox UpdateLowerY(uint32 y) const { return BoundingBox(_lower.x, y, _upper.x, _upper.y); }
     BoundingBox UpdateUpperY(uint32 y) const { return BoundingBox(_lower.x, _lower.y, _upper.x, y); }
     BoundingBox UpdateLowerDim(uint32 dim, uint32 val) const;
     BoundingBox UpdateUpperDim(uint32 dim, uint32 val) const;

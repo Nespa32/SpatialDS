@@ -11,14 +11,14 @@
 class KdTree : public AbstractSpatialDS
 {
 public:
-    explicit KdTree(uint32 maxX, uint32 maxY);
+    explicit KdTree(BoundingBox const& box);
 
-    bool Find(Point const& p) override;
+    bool Find(Point const& p) const override;
     void Insert(Point const& p) override;
     void Delete(Point const& p) override;
-
-    Point* NearestNeighbour(Point const& p);
-    std::vector<Point*> KNearestNeighbour(Point const& p, uint32 k);
+    Point* NearestNeighbour(Point const& p) const override;
+    PointVec KNearestNeighbour(Point const& p, uint32 k) const override;
+    PointVec RangeSearch(BoundingBox const& box) const override;
 
 public:
     struct TreeNode; // forward declaration
@@ -38,55 +38,39 @@ public:
     };
 
 private:
-    TreeNode* FindMin(uint32 dim, TreeNode* node);
+    TreeNode* FindMin(uint32 dim, TreeNode* node) const;
 	Point* NearestNeighbourImpl(Point const& p, float& closestSqrDist,
-		TreeNode const* node, BoundingBox b);
+		TreeNode const* node, BoundingBox nodeBox) const;
+    void RangeSearchImpl(BoundingBox const& box, PointVec& points,
+        TreeNode const* node, BoundingBox nodeBox) const;
 
 private:
-    // initial region size
-    uint32 _maxX;
-    uint32 _maxY;
-
     TreeNode* _root = nullptr;
 };
 
-KdTree::KdTree(uint32 maxX, uint32 maxY) : _maxX(maxX), _maxY(maxY) { }
+KdTree::KdTree(BoundingBox const& box) : AbstractSpatialDS(box) { }
 
-bool KdTree::Find(Point const& p)
+bool KdTree::Find(Point const& p) const
 {
-    TreeNode* ptr = _root;
-    uint32 lowerX = 0;
-    uint32 lowerY = 0;
-    uint32 upperX = _maxX;
-    uint32 upperY = _maxY;
+    TreeNode const* ptr = _root;
+    BoundingBox box = _box;
 
     while (ptr)
     {
-        if (ptr->point == p)
+        Point const& center = ptr->point;
+        if (center == p)
             return true;
 
-        // calc which half p is on
-        uint32 centerX = ptr->point.x;
-        uint32 centerY = ptr->point.y;
-        uint32 dim = ptr->dim;
+        uint32 const dim = ptr->dim;
+        uint32 const dimValue = center.GetDim(dim);
 
-        // @todo: improve
-        if (dim == 0) // x
-        {
-            if (p.x >= centerX)
-                lowerX = centerX;
-            else
-                upperX = centerX;
-        }
-        else if (dim == 1) // y
-        {
-            if (p.y >= centerY)
-                lowerY = centerY;
-            else
-                upperY = centerY;
-        }
+        bool rightHalf = (p.GetDim(dim) >= dimValue);
+        if (rightHalf)
+            box.UpdateLowerDim(dim, dimValue);
+        else
+            box.UpdateUpperDim(dim, dimValue);
 
-        ptr = (p.GetDim(dim) >= ptr->point.GetDim(dim)) ? ptr->right : ptr->left;
+        ptr = (rightHalf ? ptr->right : ptr->left);
     }
 
     return false;
@@ -96,39 +80,25 @@ void KdTree::Insert(Point const& p)
 {
     TreeNode* parentPtr = nullptr;
     TreeNode* ptr = _root;
-    uint32 lowerX = 0;
-    uint32 lowerY = 0;
-    uint32 upperX = _maxX;
-    uint32 upperY = _maxY;
+    BoundingBox box = _box;
 
     while (ptr)
     {
-        if (ptr->point == p)
-            return;
+        Point const& center = ptr->point;
+        if (center == p)
+            return; // p already exists
 
-        // calc which half p is on
-        uint32 centerX = ptr->point.x;
-        uint32 centerY = ptr->point.y;
-        uint32 dim = ptr->dim;
+        uint32 const dim = ptr->dim;
+        uint32 const dimValue = center.GetDim(dim);
 
-        // @todo: improve
-        if (dim == 0) // x
-        {
-            if (p.x >= centerX)
-                lowerX = centerX;
-            else
-                upperX = centerX;
-        }
-        else if (dim == 1) // y
-        {
-            if (p.y >= centerY)
-                lowerY = centerY;
-            else
-                upperY = centerY;
-        }
+        bool rightHalf = (p.GetDim(dim) >= dimValue);
+        if (rightHalf)
+            box.UpdateLowerDim(dim, dimValue);
+        else
+            box.UpdateUpperDim(dim, dimValue);
 
         parentPtr = ptr;
-        ptr = (p.GetDim(dim) >= ptr->point.GetDim(dim)) ? ptr->right : ptr->left;
+        ptr = (rightHalf ? ptr->right : ptr->left);
     }
 
     // @todo: need a uniform method that gives "next dim"
@@ -154,14 +124,12 @@ void KdTree::Delete(Point const& p)
 {
     TreeNode* parentPtr = nullptr;
     TreeNode* ptr = _root;
-    uint32 lowerX = 0;
-    uint32 lowerY = 0;
-    uint32 upperX = _maxX;
-    uint32 upperY = _maxY;
+    BoundingBox box = _box;
 
     while (ptr)
     {
-        if (ptr->point == p)
+        Point const& center = ptr->point;
+        if (center == p)
         {
             // ptr is a leaf node, can just cleanly remove
             if (ptr->left == nullptr && ptr->right == nullptr)
@@ -224,35 +192,23 @@ void KdTree::Delete(Point const& p)
             delete ptr;
 
             return;
-            }
-
-        // calc which half p is on
-        uint32 centerX = ptr->point.x;
-        uint32 centerY = ptr->point.y;
-        uint32 dim = ptr->dim;
-
-        // @todo: improve
-        if (dim == 0) // x
-        {
-            if (p.x >= centerX)
-                lowerX = centerX;
-            else
-                upperX = centerX;
         }
-        else if (dim == 1) // y
-        {
-            if (p.y >= centerY)
-                lowerY = centerY;
-            else
-                upperY = centerY;
-        }
+
+        uint32 const dim = ptr->dim;
+        uint32 const dimValue = center.GetDim(dim);
+
+        bool rightHalf = (p.GetDim(dim) >= dimValue);
+        if (rightHalf)
+            box.UpdateLowerDim(dim, dimValue);
+        else
+            box.UpdateUpperDim(dim, dimValue);
 
         parentPtr = ptr;
-        ptr = (p.GetDim(dim) >= ptr->point.GetDim(dim)) ? ptr->right : ptr->left;
+        ptr = (rightHalf ? ptr->right : ptr->left);
     }
 }
 
-KdTree::TreeNode* KdTree::FindMin(uint32 dim, TreeNode* node)
+KdTree::TreeNode* KdTree::FindMin(uint32 dim, TreeNode* node) const
 {
     if (node == nullptr)
         return nullptr;
@@ -273,16 +229,15 @@ KdTree::TreeNode* KdTree::FindMin(uint32 dim, TreeNode* node)
     }
 }
 
-Point* KdTree::NearestNeighbour(Point const& p)
+Point* KdTree::NearestNeighbour(Point const& p) const
 {
 	float closestSqrDist = std::numeric_limits<float>::max();
-	BoundingBox box(_maxX, _maxY);
 
-	NearestNeighbourImpl(p, closestSqrDist, _root, box);
+	NearestNeighbourImpl(p, closestSqrDist, _root, _box);
 }
 
 Point* KdTree::NearestNeighbourImpl(Point const& p, float& closestSqrDist,
-        TreeNode const* node, BoundingBox box)
+        TreeNode const* node, BoundingBox box) const
 {
     if (node == nullptr)
         return nullptr;
@@ -344,7 +299,7 @@ Point* KdTree::NearestNeighbourImpl(Point const& p, float& closestSqrDist,
     return res;
 }
 
-std::vector<Point*> KdTree::KNearestNeighbour(Point const& p, uint32 k)
+PointVec KdTree::KNearestNeighbour(Point const& p, uint32 k) const
 {
     // need an additional struct to represent points *AND* nodes seperately in
     //  a priority queue (polymorphism is overkill)
@@ -355,12 +310,12 @@ std::vector<Point*> KdTree::KNearestNeighbour(Point const& p, uint32 k)
         // point
         Point* point = nullptr;
         // node
-        KdTree::TreeNode* node = nullptr;
+        KdTree::TreeNode const* node = nullptr;
         BoundingBox box;
 
         explicit QueueElement(float d, Point* p) :
             sqrDist(d), isPoint(true), point(p) { }
-        explicit QueueElement(float d, KdTree::TreeNode* n, BoundingBox b) :
+        explicit QueueElement(float d, KdTree::TreeNode const* n, BoundingBox b) :
             sqrDist(d), isPoint(false), node(n), box(b) { }
 
         QueueElement& operator=(QueueElement const& e) = default;
@@ -371,20 +326,21 @@ std::vector<Point*> KdTree::KNearestNeighbour(Point const& p, uint32 k)
         return l.sqrDist > r.sqrDist;
     };
 
-    std::vector<Point*> points;
+    PointVec points;
     if (!_root)
         return points;
 
     std::priority_queue<QueueElement, std::vector<QueueElement>,
                         decltype(queueCmpFn)> queue(queueCmpFn);
 
-    BoundingBox box(_maxX, _maxY);
+    BoundingBox box = _box;
 
-    queue.push(QueueElement(box.SqrDistTo(p), _root, box));
+    queue.emplace(box.SqrDistTo(p), _root, box);
 
     while (!queue.empty())
     {
-        QueueElement const& e = queue.top();
+        QueueElement e = queue.top();
+        queue.pop();
 
         if (e.isPoint)
         {
@@ -394,11 +350,11 @@ std::vector<Point*> KdTree::KNearestNeighbour(Point const& p, uint32 k)
         }
         else
         {
-            TreeNode* node = e.node;
+            TreeNode const* node = e.node;
             BoundingBox box = e.box;
 
             // push point (counts as a child)
-            Point* point = &node->point;
+            Point* point = const_cast<Point*>(&node->point);
             queue.emplace(point->SqrDistTo(p), point);
 
             // push left/right node
@@ -416,11 +372,40 @@ std::vector<Point*> KdTree::KNearestNeighbour(Point const& p, uint32 k)
                 queue.emplace(rightBox.SqrDistTo(p), node->right, rightBox);
             }
         }
-
-        queue.pop();
     }
 
     return points;
+}
+
+PointVec KdTree::RangeSearch(BoundingBox const& box) const
+{
+    PointVec points;
+
+    RangeSearchImpl(box, points, _root, _box);
+
+    return points;
+}
+
+void KdTree::RangeSearchImpl(BoundingBox const& box, PointVec& points,
+    TreeNode const* node, BoundingBox nodeBox) const
+{
+    if (node == nullptr)
+        return;
+
+    if (box.Intersects(nodeBox) == false)
+        return;
+
+    Point* point = const_cast<Point*>(&node->point);
+    if (box.Contains(*point))
+        points.push_back(point);
+
+    uint32 dim = node->dim;
+    uint32 val = point->GetDim(dim);
+    BoundingBox leftBox = box.UpdateUpperDim(dim, val);
+    BoundingBox rightBox = box.UpdateLowerDim(dim, val);
+
+    RangeSearchImpl(box, points, node->left, leftBox);
+    RangeSearchImpl(box, points, node->right, rightBox);
 }
 
 #endif // _KD_TREE_H
