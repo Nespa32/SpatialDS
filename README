@@ -1,0 +1,30 @@
+To build the executable:
+$ cd repo
+$ mkdir -p build && cd build
+$ cmake ../
+$ make
+
+This generates an executable named "runnable", in the build directory.
+It has the following options:
+Option              Meaning
+ --seed <n>         Sets initial rng seed, 42 by default
+ --box_size <n>     Sets bounding box size for spatial data structure construction, default is 1e9
+ --batch_size <n>   Number of points in a batch during measurements, default is 1e6
+ --loops <n>        Number of loops, each uses a single batch (each batch increases data structure size, no wipe). 10 by default
+Follow options enable/disable method measurements, and are enabled by default
+0 disables the operation, >0 enables it
+ --find <b>         "Find"
+ --insert <b>       "Insert"
+ --delete <b>       "Delete"
+ --nn <b>           "Nearest Neighbour"
+ --knn <b>          "K-Nearest Neighbour"
+ --rangesearch <b>  "Range Search"
+
+Output of the program are the measurements on all 3 data structures (Point-region quadtrees, Point quadtrees, Kd-trees) for the selected methods
+
+Examples:
+Measure inserts with each batch having 50000 points
+$ ./runnable --batch_size 50000 --loops 10 --insert 1 --find 0 --delete 0 --nn 0 --knn 0 --rangesearch 0
+Measure everything with default options
+$ ./runnable
+
