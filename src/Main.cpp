@@ -1,4 +1,5 @@
-#include <stdio.h>
+
+#include <cstdio>
 #include <cassert>
 #include <random>
 #include <chrono>
@@ -32,14 +33,27 @@ template<class T>
 void TestAndMeasure();
 
 // globals, used by TestAndMeasure
+// initial seed for each tree
 uint32 seed = 42;
-uint32 box_size = 1e9; // size of tree bounding box
+// size of tree bounding box
+uint32 box_size = 1e9;
 // size of each data batch
-uint32 batch_size = 1e5;
-uint32 loops = 1e1;
+uint32 batch_size = 1e6;
+// number of loops
+uint32 loops = 10;
+// whether operation should be tested or not
+bool op_find = true;
+bool op_insert = true;
+bool op_delete = true;
+bool op_nn = true;
+bool op_knn = true;
+bool op_rangesearch = true;
 
 int main(int argc, char** argv)
 {
+    // disable stdout buffering
+    setbuf(stdout, nullptr);
+
     for (int i = 1; i < argc; ++i)
     {
         std::string option = argv[i];
@@ -62,6 +76,18 @@ int main(int argc, char** argv)
             batch_size = value;
         else if (option == "--loops")
             loops = value;
+        else if (option == "--find")
+            op_find = bool(value);
+        else if (option == "--insert")
+            op_insert = bool(value);
+        else if (option == "--delete")
+            op_delete = bool(value);
+        else if (option == "--nn")
+            op_nn = bool(value);
+        else if (option == "--knn")
+            op_knn = bool(value);
+        else if (option == "--rangesearch")
+            op_rangesearch = bool(value);
         else
             printf("Unrecognized option '%s', skipping\n", option.c_str());
     }
@@ -96,7 +122,7 @@ void TestAndMeasure()
         {
             uint32 x = dis(gen);
             uint32 y = dis(gen);
-            batch.emplace_back(x, y);
+            batch[j] = Point(x, y);
         }
 
         // not_batch is *not* inserted into the tree
@@ -105,7 +131,7 @@ void TestAndMeasure()
         {
             uint32 x = dis(gen);
             uint32 y = dis(gen);
-            not_batch.emplace_back(x, y);
+            not_batch[j] = Point(x, y);
         }
 
         // now, with each batch:
@@ -116,11 +142,15 @@ void TestAndMeasure()
             for (Point const& p : batch)
                 tree.Insert(p);
 
-            printf("Insert in %u ms, batch %u, total %u\n",
-                clock.GetDuration(), i, batch_sum);
+            if (op_insert)
+            {
+                printf("Insert in %u ms, batch %u, total %u\n",
+                    clock.GetDuration(), i, batch_sum);
+            }
         }
 
         // 2. find batch points
+        if (op_find)
         {
             HighResClock clock;
 
@@ -138,6 +168,7 @@ void TestAndMeasure()
         }
 
         // 3. find non-batch points
+        if (op_find)
         {
             HighResClock clock;
 
@@ -153,6 +184,7 @@ void TestAndMeasure()
         }
 
         // 4. do a NN search on batch points
+        if (op_nn)
         {
             HighResClock clock;
 
@@ -168,6 +200,7 @@ void TestAndMeasure()
         }
 
         // 5. do a k-NN search, with k=1 on batch points
+        if (op_nn)
         {
             HighResClock clock;
 
@@ -184,6 +217,7 @@ void TestAndMeasure()
         }
 
         // 6. do a k-NN search, with k>1 on non-batch points
+        if (op_knn)
         {
             HighResClock clock;
 
@@ -202,6 +236,7 @@ void TestAndMeasure()
         // 7. @todo: range search
 
         // 8. delete batch points
+        if (op_delete)
         {
             HighResClock clock;
 
@@ -210,10 +245,10 @@ void TestAndMeasure()
 
             printf("Delete in %u ms, batch %u, total %u\n",
                 clock.GetDuration(), i, batch_sum);
-        }
 
-        // to maintain the same number of elements, add not-batch points
-        for (Point const& p : not_batch)
-            tree.Insert(p);
+            // to maintain the same number of elements, add not-batch points
+            for (Point const& p : not_batch)
+                tree.Insert(p);
+        }
     }
 }
