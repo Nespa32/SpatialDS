@@ -223,7 +223,7 @@ Point* PRQuadTree::NearestNeighbour(Point const& p) const
 {
     float closestSqrDist = std::numeric_limits<float>::max();
 
-    NearestNeighbourImpl(p, closestSqrDist, &_root, _box);
+    return NearestNeighbourImpl(p, closestSqrDist, &_root, _box);
 }
 
 Point* PRQuadTree::NearestNeighbourImpl(Point const& p, float& closestSqrDist,
